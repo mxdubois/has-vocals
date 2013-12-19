@@ -3,24 +3,24 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-public class HasVocalsContainer implements IDataContainer {
+public class LabeledDataContainer implements IDataContainer {
 
 	private File mFile;
 	private LabeledData[] mDataList;
 	private int mIdx;
 
-	public HasVocalsContainer(File file) {
+	public LabeledDataContainer(File file) {
 		mFile = file;
 	}
 
 	@Override
-	public void open() throws Exception {
+	public void open() throws DataUnavailableException {
 		mDataList = LabeledData.readFromFile(mFile);
 		mIdx = 0;
 	}
 
 	@Override
-	public void close() throws Exception {
+	public void close() throws DataUnavailableException {
 		mDataList = null;
 	}
 
@@ -30,7 +30,7 @@ public class HasVocalsContainer implements IDataContainer {
 	}
 
 	@Override
-	public LabeledData next() throws Exception {
+	public LabeledData next() throws DataUnavailableException {
 		LabeledData next = mDataList[mIdx];
 		mIdx++;
 		return next;

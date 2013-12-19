@@ -24,6 +24,7 @@ public class HasVocals {
 		boolean recurse = false;
 		int n = Integer.MAX_VALUE;
 		int maxEpochs = 1000;
+		int maxThreads = Integer.MAX_VALUE;
 		double maxError = .05;
 		
 		File dataFile = null;
@@ -47,7 +48,6 @@ public class HasVocals {
         }
 		
 		//Required args
-        
         File temp = new File(args[args.length - 1]);
 		
 		if(args.length > MAIN_REQUIRED_ARGS) {
@@ -99,6 +99,13 @@ public class HasVocals {
 	                    	i+=2;
 	                        break;
 	                        
+	                    case 't' :
+	                    case 'T' :
+	                    	maxThreads = 
+	                    		Integer.parseInt(getOptionParameter(args, i));
+	                    	i++;
+	                        break;
+	                        
 	                    default :
 	                    	System.out.println("Invalid flag " + args[i]
 	                                			+ "Use option -h for help.");
@@ -136,7 +143,7 @@ public class HasVocals {
 				System.exit(1);
 			}
 		} else {
-			hasVocals.train(temp, recurse, n, maxError, maxEpochs);
+			hasVocals.train(temp, recurse, n, maxError, maxEpochs, maxThreads);
 		}
 		//hasVocals.saveNeuralNetwork(annOutputFile);
 	}
@@ -171,12 +178,12 @@ public class HasVocals {
 	//--------------------------------------------------------------------------
 	
 	private PrintStream mOut;
-	private NeuralNetwork mNeuralNetwork;
+	private Mlp mNeuralNetwork;
 	private List<File> mAudioFileList;
 	private List<File> mDataFileList;
 	private File mTemp;
 	private HashMap<String, Double> mLabelsByFilename;
-	private ArrayList<HasVocalsContainer> mTrainingContainers;
+	private ArrayList<LabeledDataContainer> mTrainingContainers;
 	
 	public HasVocals(PrintStream out) {
 		if(out != null)
@@ -185,19 +192,22 @@ public class HasVocals {
 	
 	public void newNeuralNetwork() {
 		SoftMax softMax = new SoftMax(1);
-		mNeuralNetwork = new NeuralNetwork();
+		StandardLogistic logistic = new StandardLogistic(1);
+		mNeuralNetwork = new Mlp();
 		
 		// Construct layer
-		NeuralNetwork.NeuralLayer hidden = 
-				new NeuralNetwork.NeuralLayer(20, null);
-		NeuralNetwork.NeuralLayer output = 
-				new NeuralNetwork.NeuralLayer(1, softMax);
+		Mlp.Layer hidden1 = 
+				new Mlp.Layer(30, logistic);
+		Mlp.Layer hidden2 = 
+				new Mlp.Layer(10, logistic);
+		Mlp.Layer output = 
+				new Mlp.Layer(1, softMax);
 		
 		// Link them up
-		mNeuralNetwork.append(hidden).append(output);
+		mNeuralNetwork.append(hidden1).append(hidden2).append(output);
 	}
 	
-	public void setNeuralNetwork(NeuralNetwork n) {
+	public void setNeuralNetwork(Mlp n) {
 		mNeuralNetwork = n;
 	}
 	
@@ -227,9 +237,10 @@ public class HasVocals {
 					  boolean recurse, 
 					  int n,
 					  double maxError,
-					  int maxEpochs) 
+					  int maxEpochs, 
+					  int maxThreads) 
 	{
-		mTrainingContainers = new ArrayList<HasVocalsContainer>();
+		mTrainingContainers = new ArrayList<LabeledDataContainer>();
 		String[] filetypes = new String[] {"mfc"};
 		FileFilter filter =  new TrainingFileFilter(filetypes, null);
 		List<File> fileList = new ArrayList<File>();
@@ -242,35 +253,36 @@ public class HasVocals {
 		Collections.shuffle(fileList);
 		fileList.subList(n, fileList.size()).clear();
 		for(File file : fileList) {
-			mTrainingContainers.add(new HasVocalsContainer(file));
+			mTrainingContainers.add(new LabeledDataContainer(file));
 		}
-		train(maxError, maxEpochs);
+		train(maxError, maxEpochs, maxThreads);
 	}
 	
-	private void train(double maxError, int maxEpochs) {
+	private void train(double maxError, int maxEpochs, int maxThreads) {
 		int trainingSize = (int) (.75 * mTrainingContainers.size());
 		int testingSize = mTrainingContainers.size() - trainingSize;
 		
 		println("Training size: " + trainingSize 
 				+ ". Testing size: " + testingSize);
 		
-		HasVocalsContainer[] trainingSet = new HasVocalsContainer[trainingSize];
+		LabeledDataContainer[] trainingSet = new LabeledDataContainer[trainingSize];
 		mTrainingContainers
 			.subList(0, trainingSize)
 				.toArray(trainingSet);
 		
-		HasVocalsContainer[] testingSet = new HasVocalsContainer[testingSize];
+		LabeledDataContainer[] testingSet = new LabeledDataContainer[testingSize];
 		mTrainingContainers
 			.subList(trainingSize, mTrainingContainers.size())
 				.toArray(testingSet);
 		
-		NeuralNetworkTrainer trainer = 
-				new NeuralNetworkTrainer(mNeuralNetwork, mOut);
+		MlpTrainer trainer = 
+				new MlpTrainer(mNeuralNetwork, mOut);
 		System.out.println("Calling trainer");
 		trainer.trainNetwork(trainingSet, 
 						     testingSet, 
 						     maxError, 
-						     maxEpochs);
+						     maxEpochs,
+						     maxThreads);
 		System.out.println("Done training");
 	}
 	
@@ -337,7 +349,7 @@ public class HasVocals {
 	private void preprocessAudio(File root, boolean recurse, int n) {
 		long start = System.currentTimeMillis();
 		println("Preprocessing audio...");
-		mTrainingContainers = new ArrayList<HasVocalsContainer>();
+		mTrainingContainers = new ArrayList<LabeledDataContainer>();
 		List<File> audioFileList = selectFiles(root, recurse, n);
 		for(int i=0; i < audioFileList.size();i++) {
 			File file = audioFileList.get(i);
@@ -356,10 +368,10 @@ public class HasVocals {
 			}
 			double label = doubleLabel.doubleValue();
 			
-			PreprocessingContainer prepContainer = null;
+			SpeechDataContainer prepContainer = null;
 			try {
 			
-				prepContainer = new PreprocessingContainer(file, label);
+				prepContainer = new SpeechDataContainer(file, label);
 				List<LabeledData> dataList = new ArrayList<LabeledData>();
 				
 				prepContainer.open();
@@ -376,13 +388,11 @@ public class HasVocals {
 	
 				LabeledData.writeToFile(dataList, mfcFile, false);
 				// TODO create container instead
-				mTrainingContainers.add(new HasVocalsContainer(mfcFile));
+				mTrainingContainers.add(new LabeledDataContainer(mfcFile));
 				
 			} catch (IOException e2) {
 				e2.printStackTrace();
-			} catch (WavFileException e2) {
-				e2.printStackTrace();
-			} catch (Exception e2) {
+			} catch (IDataContainer.DataUnavailableException e2) {
 				e2.printStackTrace();
 			} finally {
 				if(prepContainer != null)

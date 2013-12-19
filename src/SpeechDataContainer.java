@@ -3,7 +3,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.ArrayBlockingQueue;
 
-public class PreprocessingContainer extends WindowedWavContainer {
+public class SpeechDataContainer extends WindowedWavContainer {
 
 	private double mLabel;
 	protected double[] mPrev;
@@ -20,7 +20,7 @@ public class PreprocessingContainer extends WindowedWavContainer {
 	protected ArrayBlockingQueue<LabeledData> mQueue;
 	private LabeledData mPadData;
 
-	PreprocessingContainer(File file, double label) {
+	SpeechDataContainer(File file, double label) {
 		super(file);
 		mLabel = label;
 
@@ -28,14 +28,15 @@ public class PreprocessingContainer extends WindowedWavContainer {
 	}
 
 	@Override
-	public void open() throws Exception {
+	public void open() throws DataUnavailableException {
 		super.open();
 		
 		mPrev = new double[mNumChannels];
 		mPrevDCOF = new double[mNumChannels];
 		
 		if(!hasNextWindow())
-			throw new Exception("There was a problem opening container.");
+			throw new DataUnavailableException(
+					"There was a problem opening container.");
 		
 		mPadData = processFrames(0, mWindowSize);
 		mPadData.setIsFake(true);
@@ -46,18 +47,26 @@ public class PreprocessingContainer extends WindowedWavContainer {
 			mQueue.add(padData);
 		}
 		
-		LabeledData firstWindow = nextWindow();
-		// Add the first window at the last position
-		mQueue.add(firstWindow);
-		
-		// compute derivatives and poll away pads until real data reaches head
-		for(int i=0; i < QUEUE_BOUND - 1; i++) {
-			pollData();
+		LabeledData firstWindow;
+		try {
+			firstWindow = nextWindow();
+			// Add the first window at the last position
+			mQueue.add(firstWindow);
+			
+			// compute derivatives and poll away pads until real data reaches head
+			for(int i=0; i < QUEUE_BOUND - 1; i++) {
+				pollData();
+			}
+		} catch (IOException e) {
+			throw new DataUnavailableException(e.getMessage());
+		} catch (WavFileException e) {
+			throw new DataUnavailableException(e.getMessage());
 		}
+		
 	}
 	
 	@Override
-	public void close() throws Exception {
+	public void close() throws DataUnavailableException {
 		super.close();
 		mPrev = null;
 		mPrevDCOF = null;
@@ -135,8 +144,16 @@ public class PreprocessingContainer extends WindowedWavContainer {
 	}
 	
 	@Override
-	public LabeledData next() throws Exception {
-		return pollData();
+	public LabeledData next() throws DataUnavailableException {
+		LabeledData datum;
+		try {
+			datum = pollData();
+		} catch (IOException e) {
+			throw new DataUnavailableException(e.getMessage());
+		} catch (WavFileException e) {
+			throw new DataUnavailableException(e.getMessage());
+		}
+		return datum;
 	}
 	
 	private LabeledData pollData() throws IOException, WavFileException {

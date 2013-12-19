@@ -40,44 +40,55 @@ public abstract class WindowedWavContainer implements IDataContainer {
 	}
 	
 	@Override
-	public void open() throws Exception {
-		mWavFile = WavFile.openWavFile(mFile);
-		
-		// Determine window length in frames
-		mSampleRate = mWavFile.getSampleRate();
-   	 	mWindowSize = mWindowConfig.getWindow(mSampleRate);
-   	 	mSlideSize = mWindowConfig.getShift(mSampleRate);
-   	 	
-   	 	if(mWindowSize < 0 || mSlideSize < 0) {
-   	 		throw new IllegalArgumentException("The .wav file you supplied "
-   	 									+ "uses an unsupported sample rate (" 
-   	 									+ mSampleRate + ").");
-   	 	}
-   	 	
-   	 	// We want a buffer size that is divisible by both window and slide
-   	 	mBufferNumFrames = mWindowSize * mSlideSize;
-   	 	mMaxBufferIdx = mBufferNumFrames - mWindowSize;
-   	 	mNumChannels = mWavFile.getNumChannels();
-		
-		
-		// Allocate memory for our buffer now
-		// Each row in the buffer matrix is a channel
-		mLongBuffer = new long[mNumChannels][mBufferNumFrames];
-		mBuffer = new double[mNumChannels][mBufferNumFrames];
+	public void open() throws DataUnavailableException {
+		try {
+			mWavFile = WavFile.openWavFile(mFile);
+			
+			// Determine window length in frames
+			mSampleRate = mWavFile.getSampleRate();
+	   	 	mWindowSize = mWindowConfig.getWindow(mSampleRate);
+	   	 	mSlideSize = mWindowConfig.getShift(mSampleRate);
+	   	 	
+	   	 	if(mWindowSize < 0 || mSlideSize < 0) {
+	   	 		throw new IllegalArgumentException("The .wav file you supplied "
+	   	 									+ "uses an unsupported sample rate (" 
+	   	 									+ mSampleRate + ").");
+	   	 	}
+	   	 	
+	   	 	// We want a buffer size that is divisible by both window and slide
+	   	 	mBufferNumFrames = mWindowSize * mSlideSize;
+	   	 	mMaxBufferIdx = mBufferNumFrames - mWindowSize;
+	   	 	mNumChannels = mWavFile.getNumChannels();
+			
+			
+			// Allocate memory for our buffer now
+			// Each row in the buffer matrix is a channel
+			mLongBuffer = new long[mNumChannels][mBufferNumFrames];
+			mBuffer = new double[mNumChannels][mBufferNumFrames];
+		} catch (IOException e) {
+			throw new DataUnavailableException(e.getMessage());
+		} catch (WavFileException e) {
+			throw new DataUnavailableException(e.getMessage());
+		}
 	}
 	
 	@Override
-	public void close() throws Exception {
+	public void close() throws DataUnavailableException {
 		mLongBuffer = null;
 		mBuffer = null;
-		mWavFile.close();
+		try {
+			mWavFile.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			throw new DataUnavailableException(e.getMessage());
+		}
 	}
 
 	@Override
 	public abstract boolean hasNext();
 
 	@Override 
-	public abstract LabeledData next() throws Exception;
+	public abstract LabeledData next() throws DataUnavailableException;
 	
 	protected boolean hasNextWindow() {
 		boolean readWholeFile = mTotalFramesRead == mWavFile.getNumFrames();

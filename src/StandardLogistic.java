@@ -1,5 +1,5 @@
 
-public class StandardLogistic implements NeuralNetwork.IActivationFunction {
+public class StandardLogistic implements Mlp.IActivationFunction {
 
 	double mAlpha;
 	
@@ -25,13 +25,13 @@ public class StandardLogistic implements NeuralNetwork.IActivationFunction {
 	public double[] dydk(int k, double[] outputs) {
 		double[] vals = new double[outputs.length];
 		for(int i=0; i < outputs.length; i++)
-			vals[i] = (1-outputs[i])*outputs[k];
+			vals[i] = dydk(k, outputs, i);
 		return vals;
 	}
 
 	@Override
 	public double dydk(int k, double[] outputs, int i) {
-		return dydk(k, outputs)[i];
+		return (1-outputs[i])*outputs[k];
 	}
 
 }

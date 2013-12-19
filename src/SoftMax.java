@@ -6,7 +6,7 @@ import java.util.Arrays;
  * @author Michael DuBois
  *
  */
-public class SoftMax implements NeuralNetwork.IActivationFunction {
+public class SoftMax implements Mlp.IActivationFunction {
 	
 	private double mAlpha;
 	private StandardLogistic mLogistic;

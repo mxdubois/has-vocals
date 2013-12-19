@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-public class TestPreprocessingContainer {
+public class TestSpeechDataContainer {
 
 	public static void main(String[] args) throws Exception {
 		if(args.length <= 0) {
@@ -20,8 +20,8 @@ public class TestPreprocessingContainer {
 			num = Integer.parseInt( args[1] );
 		
 		
-		PreprocessingContainer container = 
-				new PreprocessingContainer(file, 1);
+		SpeechDataContainer container = 
+				new SpeechDataContainer(file, 1);
 		System.out.println("WindowSize: " + container.getWindowSize());
 		System.out.println("ShiftSize: " + container.getShiftSize());
 		long start = System.currentTimeMillis();
