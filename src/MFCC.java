@@ -14,7 +14,7 @@ public class MFCC {
 	// From ETSI ES 201 108 V1.1.3 (2003-09):
 	// fStart = 64 Hz, roughly corresponds to the case where the full 
 	// frequency band is divided into 24 channels
-	private static final double fStart = 64;
+	private static final double fStart = 64D;
 	private static final int NUM_MEL_CHANNELS = 24;
 	
 	/**
@@ -23,11 +23,16 @@ public class MFCC {
 	 * @param sampleRate - sample rate in Hz
 	 * @return
 	 */
-	public static double[][] computeMFCC(double[][][] channels, double sampleRate) {
+	public static double[][] computeMFCC(double[][][] channels, double sampleRate, int numCoeff, int offsetCoeff) {
 		// For each channel
 		double[][] mfccs = new double[channels.length][];
+		
+		
 		for(int i=0; i < channels.length; i++) {
-			mfccs[i] = computeMFCC(channels[i][0], sampleRate);
+			//System.out.println();
+			//System.out.println("input:" + Arrays.toString(channels[i][0]));
+			mfccs[i] = computeMFCC(channels[i][0], sampleRate, numCoeff, offsetCoeff);
+			//System.out.println("mfccs:" + Arrays.toString(mfccs[i]));
 		}
 		return mfccs;
 	}
@@ -38,7 +43,7 @@ public class MFCC {
 	 * @param sampleRate - sample rate in Hz
 	 * @return
 	 */
-	public static double[] computeMFCC(double[] channelVals, double sampleRate) {
+	public static double[] computeMFCC(double[] channelVals, double sampleRate, int numCoeff, int offsetCoeff) {
 		// length in frames of the fft
 		int fftl = channelVals.length;
 		double[] melBank = new double[NUM_MEL_CHANNELS];
@@ -48,17 +53,19 @@ public class MFCC {
 		
 		// FFT
 		Complex[] fft;
-		fft = fftransformer.transform(channelVals, 
-			  						  TransformType.FORWARD);
+		fft = fftransformer.transform(channelVals,TransformType.FORWARD);
+		
+		//System.out.println("fft:" + Arrays.toString(fft));
 		
 		double fs = sampleRate;
 		double fsHalf = fs / 2D;
 		double melFStart = mel(fStart);
-		double melHalfSampleRate = mel(fsHalf);
+		double melFsHalf = mel(fsHalf);
 		
 		// The index of each mel channel in the fft bank
 		int[] cbins = new int[25];		
 		
+		double quotient = ( melFsHalf - melFStart ) / (double) NUM_MEL_CHANNELS;
 		for(int i=0; i < cbins.length; i++) {
 			
 			if(i == 0) {
@@ -68,46 +75,58 @@ public class MFCC {
 				
 			} else {
 			
-				double quotient = ( melHalfSampleRate - melFStart ) / 24D;
-				double fci = melInverse( melFStart + (quotient * i) );
+				double fci = melInverse( melFStart + (quotient * ((double)i)) );
 				
-				cbins[i] = (int) Math.round( (fci / fs) * fftl );
+				cbins[i] = (int) Math.round( (fci / fs) * ((double)fftl) );
 				
 			}			
 		}
 		
-		// Now compute the mel filter outputs
-		for(int j=0; j < melBank.length; j++) {
-			int k = j + 1;
+		// From ETSI ES 201 108 V1.1.3 (2003-09):
+		// The output of the mel filter is the weighted sum of the 
+		// FFT magnitude spectrum values in each band
+		// The half-overlapped windowing is used as follows:
+		for(int k=1; k < cbins.length - 1; k++) {
+			double sum = 0D;
 			
-			double sum = 0;
-			for(int i=cbins[k - 1]; i <= k; i++) {
+			// First portion of sum
+			double denominator = cbins[k] - cbins[k-1] + 1;
+			for(int i=cbins[k - 1]; i <= cbins[k]; i++) {
 				double fftVal = fft[i].abs();
 				double numerator = i - cbins[k-1] + 1;
-				double denominator = cbins[k] - cbins[k-1] + 1;
 				double val = (numerator / denominator) * fftVal;
 				sum += val;
 			}
-			for(int i=cbins[k] + 1; i <= k+1; i++) {
+			
+			// Second portion of sum
+			denominator = cbins[k+1] - cbins[k] + 1;
+			for(int i=cbins[k] + 1; i <= cbins[k+1]; i++) {
 				double fftVal = fft[i].abs();
 				double numerator = i - cbins[k];
-				double denominator = cbins[k+1] - cbins[k] + 1;
 				double val = (1 - (numerator/denominator)) * fftVal;
 				sum += val;
 			}
 			
-			// The mel filter output
-			melBank[j] = limitedLn(sum);
+			// The filter output is subjected to a limited logarithm function
+			melBank[k - 1] = limitedLn(sum);
 		}
 		
 		// Compute the 13-order mel-frequency cepstral coefficients from filter
-		double[] mfccs = new double[13];
-		for(int i=0; i < mfccs.length; i++) {
+		double[] mfccs = new double[numCoeff];
+		double denominator = NUM_MEL_CHANNELS - 1;
+		for(int i=offsetCoeff; i < mfccs.length; i++) {
+			// Start calculating coeffs at the given coeff offset
+			int j = i + offsetCoeff;
+			
 			double sum = 0;
-			double quotient = (Math.PI * i / 23);
-			for(int j=0; j < melBank.length; j++) {
-				sum += melBank[j] * Math.cos(quotient * (j - .5));
+			// Sum the Discrete Cosine Transforms
+			quotient = (Math.PI * ((double)j) / denominator);
+			for(int k=0; k < melBank.length; k++) {
+				int n = k + 1;
+				double d = melBank[k] * Math.cos(quotient * (n - .5D));
+				sum += d;
 			}
+			
 			mfccs[i] = sum; 
 		}
 		
@@ -118,7 +137,7 @@ public class MFCC {
 	}
 	
 	public static double limitedLn(double x) {
-		return Math.max(Math.log(x), -50);
+		return Math.max(Math.log(x), -50D);
 	}
 	
 	public static double mel(double x) {
@@ -126,8 +145,7 @@ public class MFCC {
 	}
 	
 	public static double melInverse(double x) {
-		x = (x / 2595D);
-		return  (Math.pow(10, x) -1D) * 700D;
+		return (Math.pow(10, x/2595D) -1D) * 700D;
 	}
 	
 }

@@ -1,8 +1,9 @@
+import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.ArrayBlockingQueue;
 
-public class HasVocalsDataContainer extends WindowedWavContainer {
+public class PreprocessingContainer extends WindowedWavContainer {
 
 	private double mLabel;
 	protected double[] mPrev;
@@ -19,18 +20,19 @@ public class HasVocalsDataContainer extends WindowedWavContainer {
 	protected ArrayBlockingQueue<LabeledData> mQueue;
 	private LabeledData mPadData;
 
-	HasVocalsDataContainer(WavFile wavFile, double label) {
-		super(wavFile);
+	PreprocessingContainer(File file, double label) {
+		super(file);
 		mLabel = label;
-		
-		mPrev = new double[mNumChannels];
-		mPrevDCOF = new double[mNumChannels];
+
 		mQueue = new ArrayBlockingQueue<LabeledData>(QUEUE_BOUND);
 	}
 
 	@Override
 	public void open() throws Exception {
 		super.open();
+		
+		mPrev = new double[mNumChannels];
+		mPrevDCOF = new double[mNumChannels];
 		
 		if(!hasNextWindow())
 			throw new Exception("There was a problem opening container.");
@@ -52,7 +54,15 @@ public class HasVocalsDataContainer extends WindowedWavContainer {
 		for(int i=0; i < QUEUE_BOUND - 1; i++) {
 			pollData();
 		}
-		System.out.println("HasVocalsDataContainer opened.");
+	}
+	
+	@Override
+	public void close() throws Exception {
+		super.close();
+		mPrev = null;
+		mPrevDCOF = null;
+		mQueue = null;
+		mPadData = null;
 	}
 	
 	@Override
@@ -60,20 +70,20 @@ public class HasVocalsDataContainer extends WindowedWavContainer {
 		// For each channel
 		for(int i=0; i < mNumChannels; i++) {
 			// For each new data entry
-			for(int j=mNewDataOffset; j < mBuffer[i].length; j++) {
+			for(int j=mNewDataOffset; j < mLongBuffer[i].length; j++) {
 				
 				// Capture temps
 				double prevDCOF = mPrevDCOF[i];
 				
 				
 				// get DC Offset-compensated value
-				double currDCOF = offsetCompensation(mBuffer[i][j], 
+				double currDCOF = offsetCompensation(mLongBuffer[i][j], 
 													 mPrev[i], 
 													 mPrevDCOF[i]);
 				
 				// To perform this on future buffers, we store the 
 				// last frame we processed, before and after
-				mPrev[i] = mBuffer[i][j];
+				mPrev[i] = mLongBuffer[i][j];
 				mPrevDCOF[i] = currDCOF;
 				
 				//mBuffer[i][j] = currDCOF;
@@ -84,6 +94,7 @@ public class HasVocalsDataContainer extends WindowedWavContainer {
 
 	@Override
 	protected LabeledData processFrames(int offset, int length) {
+		long start = System.currentTimeMillis();
 		double[] features, labels;
 	
 		double[] logEnergies = new double[mNumChannels];
@@ -96,14 +107,15 @@ public class HasVocalsDataContainer extends WindowedWavContainer {
 				hammingWindow(mBuffer, offset, length, paddedLength);
 		
 		double[][] mfccsByChannel = 
-				MFCC.computeMFCC(hammedChannels, mSampleRate);
+				MFCC.computeMFCC(hammedChannels, mSampleRate, 13, 1);
 		
 		int numMfccs = mfccsByChannel[0].length;
 		int featPerChannel = numMfccs + 1;
 		int fLength = mfccsByChannel.length * featPerChannel;
 		features = new double[fLength];
 		for(int i=0; i < mNumChannels; i++) {
-			System.out.println(Arrays.toString(mfccsByChannel[i]));
+			//if(i == 0)
+				//System.out.println(Arrays.toString(mfccsByChannel[i]));
 			
 			int cOffset = i * featPerChannel;
 			features[cOffset] = logEnergies[i];
@@ -111,7 +123,8 @@ public class HasVocalsDataContainer extends WindowedWavContainer {
 				features[cOffset + 1 + j] = mfccsByChannel[i][j];
 			}
 		}
-		
+		long elapsed = System.currentTimeMillis() - start;
+		//System.out.println("processing one window takes " + elapsed + "ms");
 		labels = new double[]{ mLabel };
 		return new LabeledData(features, labels);
 	}
@@ -231,9 +244,9 @@ public class HasVocalsDataContainer extends WindowedWavContainer {
 			window[c][1] = new double[paddedLength];
 			
 			if(c == 0) {
-				//System.out.println("got");
-				//System.arraycopy(buffer[c], offset, window[c][0], 0, length);
-				//System.out.println(Arrays.toString(window[c][0]));
+//				System.out.println("got");
+//				System.arraycopy(buffer[c], offset, window[c][0], 0, length);
+//				System.out.println(Arrays.toString(window[c][0]));
 			}
 			
 			// For each value

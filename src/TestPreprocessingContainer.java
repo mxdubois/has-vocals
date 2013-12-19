@@ -1,8 +1,10 @@
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 
-public class TestHasVocalsDataContainer {
+public class TestPreprocessingContainer {
 
 	public static void main(String[] args) throws Exception {
 		if(args.length <= 0) {
@@ -18,8 +20,8 @@ public class TestHasVocalsDataContainer {
 			num = Integer.parseInt( args[1] );
 		
 		
-		HasVocalsDataContainer container = 
-				new HasVocalsDataContainer(wavFile, 1);
+		PreprocessingContainer container = 
+				new PreprocessingContainer(file, 1);
 		System.out.println("WindowSize: " + container.getWindowSize());
 		System.out.println("ShiftSize: " + container.getShiftSize());
 		long start = System.currentTimeMillis();
@@ -31,8 +33,8 @@ public class TestHasVocalsDataContainer {
 			
 			windows++;
 		}
-		long elapsed = System.currentTimeMillis() - start;
-		System.out.println("processed " + windows + " windows");
-		System.out.println("elapsed: " + elapsed + "ms");
+		//long elapsed = System.currentTimeMillis() - start;
+		//System.out.println("processed " + windows + " windows");
+		//System.out.println("elapsed: " + elapsed + "ms");
 	}
 }

@@ -8,5 +8,6 @@
 			<attribute name="javadoc_location" value="file:/C:/Users/DuBious/Documents/ai-dj/code/has-vocals/lib/"/>
 		</attributes>
 	</classpathentry>
+	<classpathentry kind="lib" path="lib/opencsv-2.3.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

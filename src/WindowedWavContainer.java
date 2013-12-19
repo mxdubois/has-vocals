@@ -1,3 +1,4 @@
+import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -10,6 +11,7 @@ public abstract class WindowedWavContainer implements IDataContainer {
 	protected int mWindowSize;
 	protected int mSlideSize;
 	protected int mBufferNumFrames;
+	protected long[][] mLongBuffer;
 	protected double[][] mBuffer;
 	protected int mNewDataOffset = 0;
 	protected int mBufferIdx = 0;
@@ -18,30 +20,15 @@ public abstract class WindowedWavContainer implements IDataContainer {
 	protected int mNumChannels;
 	protected WindowConfig mWindowConfig;
 	protected long mSampleRate;
+	private File mFile;
 
-	public WindowedWavContainer(WavFile wavFile) {
-		this(wavFile, DEFAULT_WINDOW_CONFIG);
+	public WindowedWavContainer(File file) {
+		this(file, DEFAULT_WINDOW_CONFIG);
 	}
 	
-	public WindowedWavContainer(WavFile wavFile, WindowConfig config) {
-		mWavFile = wavFile;
-		
+	public WindowedWavContainer(File file, WindowConfig config) {
+		mFile = file;
 		mWindowConfig = config;
-		
-		// Determine window length in frames
-		mSampleRate = mWavFile.getSampleRate();
-   	 	mWindowSize = mWindowConfig.getWindow(mSampleRate);
-   	 	mSlideSize = mWindowConfig.getShift(mSampleRate);
-   	 	
-   	 	if(mWindowSize < 0 || mSlideSize < 0) {
-   	 		throw new IllegalArgumentException("The .wav file you supplied "
-   	 									+ "uses an unsupported sample rate.");
-   	 	}
-   	 	
-   	 	// We want a buffer size that is divisible by both window and slide
-   	 	mBufferNumFrames = mWindowSize * mSlideSize;
-   	 	mMaxBufferIdx = mBufferNumFrames - mWindowSize;
-   	 	mNumChannels = mWavFile.getNumChannels();
 	}
 	
 	public int getWindowSize() {
@@ -54,13 +41,34 @@ public abstract class WindowedWavContainer implements IDataContainer {
 	
 	@Override
 	public void open() throws Exception {
+		mWavFile = WavFile.openWavFile(mFile);
+		
+		// Determine window length in frames
+		mSampleRate = mWavFile.getSampleRate();
+   	 	mWindowSize = mWindowConfig.getWindow(mSampleRate);
+   	 	mSlideSize = mWindowConfig.getShift(mSampleRate);
+   	 	
+   	 	if(mWindowSize < 0 || mSlideSize < 0) {
+   	 		throw new IllegalArgumentException("The .wav file you supplied "
+   	 									+ "uses an unsupported sample rate (" 
+   	 									+ mSampleRate + ").");
+   	 	}
+   	 	
+   	 	// We want a buffer size that is divisible by both window and slide
+   	 	mBufferNumFrames = mWindowSize * mSlideSize;
+   	 	mMaxBufferIdx = mBufferNumFrames - mWindowSize;
+   	 	mNumChannels = mWavFile.getNumChannels();
+		
+		
 		// Allocate memory for our buffer now
 		// Each row in the buffer matrix is a channel
+		mLongBuffer = new long[mNumChannels][mBufferNumFrames];
 		mBuffer = new double[mNumChannels][mBufferNumFrames];
 	}
 	
 	@Override
 	public void close() throws Exception {
+		mLongBuffer = null;
 		mBuffer = null;
 		mWavFile.close();
 	}
@@ -129,7 +137,9 @@ public abstract class WindowedWavContainer implements IDataContainer {
 			// Copy frames we still need to front of buffer in each channel
 			// (A tad inefficient, but much simpler)
 			for(int i=0; i < mNumChannels; i++) {
+				// for each buffer, sigh...
 				System.arraycopy(mBuffer[i], numToRead, mBuffer, 0, spannedFrames);
+				System.arraycopy(mLongBuffer[i], numToRead, mLongBuffer, 0, spannedFrames);
 			}
 		}
 		
@@ -141,7 +151,7 @@ public abstract class WindowedWavContainer implements IDataContainer {
 			int padOffset = mNewDataOffset + numToRead;
 			// Fill the rest with zeros in every channel
 			for(int i=0; i < mNumChannels; i++) {
-				Arrays.fill(mBuffer[i], padOffset, mBufferNumFrames, 0);
+				Arrays.fill(mLongBuffer[i], padOffset, mBufferNumFrames, 0);
 			}
 			int endIdx = padOffset + (padOffset % mWindowSize);
 			mMaxBufferIdx = endIdx - mWindowSize;
@@ -149,13 +159,11 @@ public abstract class WindowedWavContainer implements IDataContainer {
 		
 		// Read frames until we've successfully filled the buffer 
 		// or read all frames in the file.
-		System.out.println("NumToRead:" + numToRead);
 		int framesRead = 0;
 		do {
-			framesRead += mWavFile.readFrames(mBuffer, 
+			framesRead += mWavFile.readFrames(mLongBuffer, 
 											  mNewDataOffset + framesRead, 
 											  numToRead);
-			System.out.println("Frames read: " + framesRead);
 		} while(framesRead != 0 && framesRead < numToRead);
 		mTotalFramesRead += framesRead;
 		mChunkNum++;
