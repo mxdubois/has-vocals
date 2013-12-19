@@ -25,7 +25,7 @@ public class HasVocals {
 		int n = Integer.MAX_VALUE;
 		int maxEpochs = 1000;
 		int maxThreads = Integer.MAX_VALUE;
-		double maxError = .05;
+		double minDeltaError = .00001;
 		
 		File dataFile = null;
         File audioDir = null;
@@ -85,7 +85,7 @@ public class HasVocals {
 	                        
 	                    case 'e' :
 	                    case 'E' :
-	                    	maxError =Double.parseDouble( 
+	                    	minDeltaError = Double.parseDouble( 
 	                    					getOptionParameter(args, i) );
 	                    	i++;
 	                        break;
@@ -136,14 +136,14 @@ public class HasVocals {
 							    temp, 
 							    recurse, 
 							    n, 
-							    maxError, 
+							    minDeltaError, 
 							    maxEpochs);
 			} catch(FileNotFoundException e) {
 				System.out.println(e.getMessage());
 				System.exit(1);
 			}
 		} else {
-			hasVocals.train(temp, recurse, n, maxError, maxEpochs, maxThreads);
+			hasVocals.train(temp, recurse, n, minDeltaError, maxEpochs, maxThreads);
 		}
 		//hasVocals.saveNeuralNetwork(annOutputFile);
 	}
@@ -217,7 +217,7 @@ public class HasVocals {
 					  File temp, 
 					  boolean recurse, 
 					  int n,
-					  double maxError,
+					  double minDeltaError,
 					  int maxEpochs) 
 		throws FileNotFoundException 
 	{
@@ -236,7 +236,7 @@ public class HasVocals {
 	public void train(File trainingDir, 
 					  boolean recurse, 
 					  int n,
-					  double maxError,
+					  double minDeltaError,
 					  int maxEpochs, 
 					  int maxThreads) 
 	{
@@ -255,10 +255,10 @@ public class HasVocals {
 		for(File file : fileList) {
 			mTrainingContainers.add(new LabeledDataContainer(file));
 		}
-		train(maxError, maxEpochs, maxThreads);
+		train(minDeltaError, maxEpochs, maxThreads);
 	}
 	
-	private void train(double maxError, int maxEpochs, int maxThreads) {
+	private void train(double minDeltaError, int maxEpochs, int maxThreads) {
 		int trainingSize = (int) (.75 * mTrainingContainers.size());
 		int testingSize = mTrainingContainers.size() - trainingSize;
 		
@@ -277,13 +277,11 @@ public class HasVocals {
 		
 		MlpTrainer trainer = 
 				new MlpTrainer(mNeuralNetwork, mOut);
-		System.out.println("Calling trainer");
-		trainer.trainNetwork(trainingSet, 
+		trainer.trainMlp(trainingSet, 
 						     testingSet, 
-						     maxError, 
+						     minDeltaError, 
 						     maxEpochs,
 						     maxThreads);
-		System.out.println("Done training");
 	}
 	
 	private void parseDataFile(File file) throws FileNotFoundException {
