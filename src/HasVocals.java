@@ -41,9 +41,13 @@ public class HasVocals {
 		String helpStr = "Usage: " + TAG 
                 + "[options] dataFile audioDir tempDir \n"
                 + "-r|-R search audiodir recursively \n"
+                + "-d|-D path/to/csv path/to/audio," 
+                		+ "specify audio data from which to generate "
+                		+ "processed training data \n"
                 + "-n|-N int, specify max # of songs to train on \n"
                 + "-m|-M int, specify max # of epochs (default " 
                 		+ maxEpochs + ") \n"
+                + "-t|-T int, specify max # of threads to use \n"
                 + "-h display this help message";
 		
 		if(args.length < MAIN_REQUIRED_ARGS) {
