@@ -1,4 +1,8 @@
-
+/**
+ * Vectors!
+ * @author Michael DuBois
+ *
+ */
 public class Vector {
 
 	/**

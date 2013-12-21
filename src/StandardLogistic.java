@@ -1,4 +1,8 @@
-
+/**
+ * The standard logistic sigmoid
+ * @author DuBious
+ *
+ */
 public class StandardLogistic implements Mlp.IActivationFunction {
 
 	double mAlpha;

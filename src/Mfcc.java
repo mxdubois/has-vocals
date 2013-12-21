@@ -5,8 +5,12 @@ import org.apache.commons.math3.transform.DftNormalization;
 import org.apache.commons.math3.transform.FastFourierTransformer;
 import org.apache.commons.math3.transform.TransformType;
 
-
-public class MFCC {
+/**
+ * Computes Mel-frequency Cepstral-Coefficients.
+ * @author DuBious
+ *
+ */
+public class Mfcc {
 
 	private static final FastFourierTransformer fftransformer = 
 			new FastFourierTransformer(DftNormalization.STANDARD);
@@ -18,8 +22,8 @@ public class MFCC {
 	private static final int NUM_MEL_CHANNELS = 24;
 	
 	/**
-	 * 
-	 * @param channels
+	 * Computes the Mel-frequency Cepstral Coefficients for the given signal.
+	 * @param channels - an array of [channels][real/imaginary][values]
 	 * @param sampleRate - sample rate in Hz
 	 * @return
 	 */
@@ -38,8 +42,8 @@ public class MFCC {
 	}
 	
 	/**
-	 * 
-	 * @param channelVals
+	 * Computes the Mel-Frequency Cepstral coefficients for the given signal
+	 * @param channelVals - signal samples for a single channel
 	 * @param sampleRate - sample rate in Hz
 	 * @return
 	 */
@@ -111,7 +115,8 @@ public class MFCC {
 			melBank[k - 1] = limitedLn(sum);
 		}
 		
-		// Compute the 13-order mel-frequency cepstral coefficients from filter
+		// Compute the numCoeff-order mel-frequency cepstral coefficients 
+		// from filter
 		double[] mfccs = new double[numCoeff];
 		double denominator = NUM_MEL_CHANNELS - 1;
 		for(int i=offsetCoeff; i < mfccs.length; i++) {
@@ -130,20 +135,32 @@ public class MFCC {
 			mfccs[i] = sum; 
 		}
 		
-		//System.out.println("Returning:");
-		//System.out.println(Arrays.toString(mfccs));
-		
 		return mfccs;
 	}
 	
+	/**
+	 * A natural log with results limited to >= -50D.
+	 * @param x
+	 * @return
+	 */
 	public static double limitedLn(double x) {
 		return Math.max(Math.log(x), -50D);
 	}
 	
+	/**
+	 * Transform frequency to the mel-scale
+	 * @param x
+	 * @return
+	 */
 	public static double mel(double x) {
 		return 2595D * Math.log10(1D + (x / 700D));
 	}
 	
+	/**
+	 * Transform mel-frequency to standard frequency.
+	 * @param x
+	 * @return
+	 */
 	public static double melInverse(double x) {
 		return (Math.pow(10, x/2595D) -1D) * 700D;
 	}

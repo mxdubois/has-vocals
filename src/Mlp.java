@@ -5,6 +5,12 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Random;
 
+/**
+ * A Multi-layer Perceptron. 
+ * The Mlp is arranged as a linked list of Layers.
+ * @author Michael DuBois
+ *
+ */
 public class Mlp {
 
 	//-------------------------------------------------------------------------
@@ -16,7 +22,7 @@ public class Mlp {
 	private static final double INITIAL_WEIGHT_MAX = 0.8;
 	
 	/**
-	 * Loads an Mlp from a file.
+	 * Loads an Mlp from a file. TODO
 	 * @param file
 	 * @param t
 	 * @return
@@ -31,7 +37,7 @@ public class Mlp {
 	}
 	
 	/**
-	 * Writes a Mlp to a file.
+	 * Writes an Mlp to a file. TODO
 	 * @param mlp
 	 * @param file
 	 * @throws IOException
@@ -57,7 +63,7 @@ public class Mlp {
 	}
 	
 	/**
-	 * Generates a random double in the range (min, max)
+	 * Generates a random double in the range (min, max) TODO refactor to utils
 	 * Gleaned from http://stackoverflow.com/a/3680648
 	 * @param rangeMin
 	 * @param rangeMax
@@ -267,6 +273,9 @@ public class Mlp {
 		private Layer mNext = null;
 		private Layer mPrev = null;
 		private Mlp.IActivationFunction mActivationFunction = null;
+		
+		// Nodes arranged as [nodeIdx][weights/deltaWeights][values]
+		// TODO should probably just bite the bullet and use Node objects.
 		private double[][][] mNodes = null;
 		
 		// Training vars
@@ -346,19 +355,25 @@ public class Mlp {
 						int len = mNodes[i][0].length;
 						mNodes[i][1] = new double[len];
 					}
+					
+					// Get a handle on the weights array
 					double[] weights = mNodes[i][0];
 					
+					// weighted sum of weights and inputs
 					outputs[i] = Vector.dot(weights,inputs);
 					
+					// If there is an activation function, run output through
 					if(activation && mActivationFunction != null)
 						outputs[i] = mActivationFunction.y(outputs, i);
 				}
 			} else if(activation && mActivationFunction != null){
+				// if there are no nodes, but there is an activation func
 				// we just return the activation of inputs
 				for(int i=0; i < outputs.length; i++)
 					outputs[i] = mActivationFunction.y(outputs, i);
 			}
 			
+			// If caller wants the final output, recurse through next layers
 			if(recurse && mNext != null)
 				outputs = mNext.evaluate(outputs, recurse, activation, isTraining);
 			
@@ -457,6 +472,10 @@ public class Mlp {
 			mNext = layer;
 		}
 		
+		/**
+		 * Returns the number of nodes in this layer.
+		 * @return
+		 */
 		public int size() {
 			return mNodes.length;
 		}

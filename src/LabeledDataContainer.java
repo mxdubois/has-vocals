@@ -2,13 +2,21 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-
+/**
+ * A DataContainer that reads LabeledData from a file.
+ * @author Michael DuBois
+ *
+ */
 public class LabeledDataContainer implements IDataContainer {
 
 	private File mFile;
 	private LabeledData[] mDataList;
 	private int mIdx;
 
+	/**
+	 * Constructs a LabeledDataContainer
+	 * @param file
+	 */
 	public LabeledDataContainer(File file) {
 		mFile = file;
 	}

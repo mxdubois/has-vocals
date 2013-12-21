@@ -13,6 +13,11 @@ import java.util.List;
 
 import au.com.bytecode.opencsv.CSVReader;
 
+/**
+ * Trains a multi-layer perceptron to detect vocals in audio segment windows.
+ * @author Michael DuBois
+ *
+ */
 public class HasVocals {
 
 	public static final String TAG = "HasVocals";
@@ -131,7 +136,7 @@ public class HasVocals {
 		hasVocals.newNeuralNetwork();
 		if(dataFile != null) { 
 			try {
-				hasVocals.train(dataFile, 
+				hasVocals.generateTrainingData(dataFile, 
 							    audioDir, 
 							    temp, 
 							    recurse, 
@@ -148,6 +153,12 @@ public class HasVocals {
 		//hasVocals.saveNeuralNetwork(annOutputFile);
 	}
 	
+	/**
+	 * Gets the i+1 string from args if it exists. Prints error if not.
+	 * @param args
+	 * @param i
+	 * @return
+	 */
 	public static String getOptionParameter(String[] args, int i) {
 		if(i + 1 >= args.length - MAIN_REQUIRED_ARGS) {
 			System.out.println("Malformed args. Use option -h for help.");
@@ -156,6 +167,11 @@ public class HasVocals {
 		return args[i+1];
 	}
 	
+	/**
+	 * Gets the filetype extension from a file name.
+	 * @param file
+	 * @return
+	 */
 	public static String getFiletype(File file) {
 		String name = file.getName();
 		int fileTypeIdx = name.lastIndexOf('.') + 1;
@@ -163,11 +179,21 @@ public class HasVocals {
 		return filetype;
 	}
 	
+	/**
+	 * Checks if the filetypes extension is csv
+	 * @param file
+	 * @return
+	 */
 	public static boolean isCSV(File file) {
 		String filetype = getFiletype(file);
 		return (filetype.equals("csv") || filetype.equals("CSV"));
 	}
 	
+	/**
+	 * Checks if the filetype extension is wav
+	 * @param file
+	 * @return
+	 */
 	public static boolean isWAV(File file) {
 		String filetype = getFiletype(file);
 		return (filetype.equals("wav") || filetype.equals("WAV"));
@@ -185,11 +211,18 @@ public class HasVocals {
 	private HashMap<String, Double> mLabelsByFilename;
 	private ArrayList<LabeledDataContainer> mTrainingContainers;
 	
+	/**
+	 * Constructs a HasVocals.
+	 * @param out
+	 */
 	public HasVocals(PrintStream out) {
 		if(out != null)
 			mOut = out;
 	}
 	
+	/**
+	 * Initializes a new neural network.
+	 */
 	public void newNeuralNetwork() {
 		SoftMax softMax = new SoftMax(1);
 		StandardLogistic logistic = new StandardLogistic(1);
@@ -207,12 +240,27 @@ public class HasVocals {
 		mNeuralNetwork.append(hidden1).append(hidden2).append(output);
 	}
 	
+	/**
+	 * Sets the neural network.
+	 * @param n
+	 */
 	public void setNeuralNetwork(Mlp n) {
 		mNeuralNetwork = n;
 	}
 	
 
-	public void train(File dataFile, 
+	/**
+	 * Public function for generating training data from wav files.
+	 * @param dataFile
+	 * @param audioDir
+	 * @param temp
+	 * @param recurse
+	 * @param n
+	 * @param minDeltaError
+	 * @param maxEpochs
+	 * @throws FileNotFoundException
+	 */
+	public void generateTrainingData(File dataFile, 
 					  File audioDir, 
 					  File temp, 
 					  boolean recurse, 
@@ -233,6 +281,15 @@ public class HasVocals {
         clearTrainingState();
 	}
 	
+	/**
+	 * Public function for training from generated training data.
+	 * @param trainingDir
+	 * @param recurse
+	 * @param n
+	 * @param minDeltaError
+	 * @param maxEpochs
+	 * @param maxThreads
+	 */
 	public void train(File trainingDir, 
 					  boolean recurse, 
 					  int n,
@@ -258,6 +315,13 @@ public class HasVocals {
 		train(minDeltaError, maxEpochs, maxThreads);
 	}
 	
+	/**
+	 * Private training function. Subsets testing data and hands it off to a
+	 * MlpTrainer.
+	 * @param minDeltaError
+	 * @param maxEpochs
+	 * @param maxThreads
+	 */
 	private void train(double minDeltaError, int maxEpochs, int maxThreads) {
 		int trainingSize = (int) (.75 * mTrainingContainers.size());
 		int testingSize = mTrainingContainers.size() - trainingSize;
@@ -284,6 +348,11 @@ public class HasVocals {
 						     maxThreads);
 	}
 	
+	/**
+	 * Parses the csv data file for labels.
+	 * @param file
+	 * @throws FileNotFoundException
+	 */
 	private void parseDataFile(File file) throws FileNotFoundException {
 		mLabelsByFilename = new HashMap<String, Double>();
 		CSVReader reader = new CSVReader(new FileReader(file));
@@ -344,6 +413,12 @@ public class HasVocals {
 		}
 	}
 	
+	/**
+	 * Preprocesses wav files into labeled speech data.
+	 * @param root
+	 * @param recurse
+	 * @param n
+	 */
 	private void preprocessAudio(File root, boolean recurse, int n) {
 		long start = System.currentTimeMillis();
 		println("Preprocessing audio...");
@@ -401,6 +476,13 @@ public class HasVocals {
 		println("Finished preprocessing audio. " + elapsed + " ms.");
 	}
 	
+	/**
+	 * Selects n files randomly from the complete list of files in root.	
+	 * @param root - the directory to search
+	 * @param recurse - whether or not to recurse through the directory
+	 * @param n - the number of files to pick
+	 * @return
+	 */
 	private List<File> selectFiles(File root, boolean recurse, int n) {
 		List<File> list = new ArrayList<File>();
 		String[] filetypes = new String[] {"wav"};
@@ -418,6 +500,9 @@ public class HasVocals {
 		return list;
 	}
 	
+	/**
+	 * Throws away objects associated with training.
+	 */
 	private void clearTrainingState() {
 		mTemp = null;
 		mLabelsByFilename = null;
@@ -425,12 +510,25 @@ public class HasVocals {
 		// TODO delete temporary files
 	}
 	
+	/**
+	 * Saves the neural network to a file... er... TODO
+	 * @param file
+	 */
 	public void saveNeuralNetwork(File file) {
 	}
 	
+	/**
+	 * Loads a neural network from a file.... er... TODO
+	 * @param file
+	 */
 	public void loadNeuralNetwork(File file) {
 	}
 	
+	/**
+	 * Detects whether or not an audio file contains vocals... TODO
+	 * @param file
+	 * @return
+	 */
 	public boolean hasVocals(File file) {
 		if(!isWAV(file))
 			throw new IllegalArgumentException(
@@ -444,6 +542,15 @@ public class HasVocals {
 		return false;
 	}
 	
+	/**
+	 * Searches a directory for files that match the given file filter.
+	 * @param node - the directory to search
+	 * @param list - the list in which to index the files
+	 * @param filter - the filter the files must pass. 
+	 * 				   If null, all files are returned.
+	 * @param recurse - whether or not to search the directory recursively
+	 * @param depth - the depth we've recursed to so far
+	 */
 	private void processDir(File node, 
 							List<File> list,
             				FileFilter filter, 
@@ -463,6 +570,14 @@ public class HasVocals {
         }
     }
 	
+	/**
+	 * Recursion helper for processDir
+	 * @param node - the directory to search
+	 * @param list - the list in which to index the files
+	 * @param filter - the filter the files must pass. 
+	 * 				   If null, all files are returned.
+	 * @param recurse - whether or not to search the directory recursively
+	 */
 	private void processDir(File node, 
 							List<File> list,
             				FileFilter filter,
@@ -472,11 +587,19 @@ public class HasVocals {
         processDir(node, list, filter, recurse, 0);
     }
 	
+	/**
+	 * Prints a string if mOut is not null
+	 * @param str
+	 */
 	public void print(String str) {
 		if(mOut != null)
 			mOut.print(str);
 	}
 	
+	/**
+	 * Prints a line if mOut is not null
+	 * @param str
+	 */
 	public void println(String str) {
 		if(mOut != null)
 			mOut.println(str);
@@ -492,10 +615,16 @@ public class HasVocals {
         List<String> mFiletypes;
 		private HashMap<String, Double> mLabels;
         
-        public TrainingFileFilter(String[] args, 
+		/**
+		 * Constructs a file filter
+		 * @param filetypes - the filetypes to accept
+		 * @param labels - if this is not null, only accepts files that have
+		 * 					labels in the hashmap.
+		 */
+        public TrainingFileFilter(String[] filetypes, 
         						  HashMap<String,Double> labels) 
         {
-            mFiletypes = new ArrayList<String>(Arrays.asList(args));
+            mFiletypes = new ArrayList<String>(Arrays.asList(filetypes));
             mLabels = labels;
         }
         

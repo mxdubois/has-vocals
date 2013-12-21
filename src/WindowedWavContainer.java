@@ -3,29 +3,53 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.ArrayBlockingQueue;
 
-
+/**
+ * An abstract class for DataContainers interfacing with wav files.
+ * @author Michael DuBois
+ *
+ */
 public abstract class WindowedWavContainer implements IDataContainer {
 	
 	protected WavFile mWavFile;
-	protected int mTotalFramesRead;
+
+	
+	// Info about the wav file
+	protected int mNumChannels;
+	protected long mSampleRate;
+	protected int mBufferNumFrames;
+	
+	// We use a (potentially) overlapping sliding window
 	protected int mWindowSize;
 	protected int mSlideSize;
-	protected int mBufferNumFrames;
-	protected long[][] mLongBuffer;
-	protected double[][] mBuffer;
-	protected int mNewDataOffset = 0;
+	
+	// Track our progress loading the file in and processing it
 	protected int mBufferIdx = 0;
+	private int mMaxBufferIdx;
+	protected int mNewDataOffset = 0;
 	protected int mChunkNum = -1;
-	protected int mMaxBufferIdx;
-	protected int mNumChannels;
-	protected WindowConfig mWindowConfig;
-	protected long mSampleRate;
+	protected int mTotalFramesRead;
+	
+	// As it stands, we need two buffers. One to read longs in from
+	// the WavFile class, and another to do our processing
+	protected double[][] mBuffer;
+	protected long[][] mLongBuffer;
+	
 	private File mFile;
+	protected WindowConfig mWindowConfig;
 
+	/**
+	 * Constructs a WindowedWavContainer with the default WindowConfig.
+	 * @param file
+	 */
 	public WindowedWavContainer(File file) {
 		this(file, DEFAULT_WINDOW_CONFIG);
 	}
 	
+	/**
+	 * Constructs a WindowedWavContainer with the given WindowConfig.
+	 * @param file
+	 * @param config
+	 */
 	public WindowedWavContainer(File file, WindowConfig config) {
 		mFile = file;
 		mWindowConfig = config;
@@ -95,10 +119,6 @@ public abstract class WindowedWavContainer implements IDataContainer {
 		boolean processedBuffer = mMaxBufferIdx - mBufferIdx < mSlideSize;
 		boolean noSlidesInFile = mWavFile.getFramesRemaining() < mSlideSize;
 		
-		//System.out.println("readWholeFile: " + readWholeFile);
-		//System.out.println("processedBuffer: " + processedBuffer);
-		//System.out.println("noSlidesInFile: " + noSlidesInFile );
-		
 		return !(processedBuffer && (readWholeFile || noSlidesInFile));
 	}
 
@@ -110,8 +130,6 @@ public abstract class WindowedWavContainer implements IDataContainer {
 		}
 		
 		LabeledData next = processFrames(mBufferIdx, mWindowSize);
-		//System.out.println("returning nextWindow");
-		//System.out.println("new mBufferIdx: " + mBufferIdx);
 		mBufferIdx += mSlideSize;
 		return next;
 	}
@@ -180,8 +198,6 @@ public abstract class WindowedWavContainer implements IDataContainer {
 		mChunkNum++;
 	}
 
-	
-	
 	
 	//--------------------------------------------------------------------------
 	// STATIC STUFF

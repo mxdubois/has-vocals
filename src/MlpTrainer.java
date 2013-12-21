@@ -17,11 +17,14 @@ import org.apache.commons.math3.stat.regression.SimpleRegression;
 
 import com.sun.xml.internal.ws.util.StringUtils;
 
-
+/**
+ * Trains an Mlp with suppplied LabeledData training data. 
+ * Training and Testing is multi-threaded.
+ * @author Michael DuBis
+ *
+ */
 public class MlpTrainer {
 
-
-	
 	// CLI Output formatting
 	public static final int CONSOLE_WIDTH = 80;
 	public static final char PROGRESS_CHAR = '=';
@@ -38,27 +41,35 @@ public class MlpTrainer {
 		
 	}
 	
+	// The main network we are training
 	private Mlp mMainNet;
+	// An array of layers in slave networks distributed among tasks
+	// we use this when we update and propagate weights
 	Mlp.Layer[] mTaskLayers;
+	
 	private PrintStream mOut;
 	private int mEpoch = 0;
 	private double mLastError = Double.NaN;
 	private double mLearningRate = 1;
+	private String mLastErrorStr;
+	private double mLastDeltaError;
+	private String mLastDeltaErrorStr;
 	
+	// Training Task stuff
 	private TrainingTask[] mTrainingTasks;
 	private List<Future<Mlp>> mTrainingTaskFutures;
 	private ExecutorCompletionService<Mlp> mTrainingEcs;
 	
+	
+	// Testing task stuff
 	private TestingTask[] mTestingTasks;
 	private List<Future<Double>> mTestingTaskFutures;
 	private ExecutorCompletionService<Double> mTestingEcs;
 	
-	private String mLastErrorStr;
 	private ExecutorService mExecutor;
 	private int mNumTrainingContainers;
 	private int mNumTestingContainers;
-	private double mLastDeltaError;
-	private String mLastDeltaErrorStr;
+
 
 	/**
 	 * Constructs an Mlp trainer.
@@ -186,6 +197,7 @@ public class MlpTrainer {
 			// While the network has not yet converged,
 			boolean converged = false;
 			while(!converged) {
+				
 				long epochStart = System.currentTimeMillis();
 				updateTrainingStatus(0); // 0% progress
 				
@@ -196,7 +208,7 @@ public class MlpTrainer {
 				mTrainingTaskFutures.clear();
 				mTestingTaskFutures.clear();
 				
-				//Train
+				// Train deltaWeights in subsets with training tasks
 				train();
 				
 				// Accumulate weights to mMainNet and propagate back to threads
@@ -218,6 +230,7 @@ public class MlpTrainer {
 					converged = true;
 					mOut.println("WARNING: Exceeded max epochs.");
 				}
+				
 				mEpoch++;
 	
 			} // end while
@@ -226,7 +239,10 @@ public class MlpTrainer {
 		} catch (ExecutionException e) {
 			e.printStackTrace();
 		}
+		
 		mExecutor.shutdownNow();
+		
+		// Print the results
 		long elapsed = System.currentTimeMillis() - startTime;
 		mOut.println("--- Your Neural Network ---");
 		mOut.println(mMainNet.toString());
@@ -285,6 +301,10 @@ public class MlpTrainer {
 		initTestingCallables(testingContainers);
 	}
 	
+	/**
+	 * Initializes callables responsible for training slave mlps
+	 * @param trainingContainers
+	 */
 	private void initTrainingCallables(IDataContainer[] trainingContainers) {
 		mTrainingEcs = new ExecutorCompletionService<Mlp>(mExecutor);
 		// Determine how to split the data among threads
@@ -311,6 +331,10 @@ public class MlpTrainer {
 		}
 	}
 	
+	/**
+	 * Initializes callables responsible for testing.
+	 * @param testingContainers
+	 */
 	private void initTestingCallables(IDataContainer[] testingContainers) {
 		mTestingEcs = new ExecutorCompletionService<Double>(mExecutor);
 		int testContainersPerThread = 
@@ -336,6 +360,13 @@ public class MlpTrainer {
 		}
 	}
 	
+	/**
+	 * Compiles the average deltaWeights from slave threads into the
+	 * main network and propagates the new weights back to all slave threads,
+	 * training and testing.
+	 * @throws ExecutionException
+	 * @throws InterruptedException
+	 */
 	private void adjustWeights()
 			throws ExecutionException, InterruptedException 
 	{
@@ -460,9 +491,10 @@ public class MlpTrainer {
 	private void computeError(IDataContainer[] testingContainers) 
 			throws InterruptedException, ExecutionException 
 	{
-		double newError;
 		mOut.println("Computing error...");
 		long testingStart = System.currentTimeMillis();
+		
+		double newError;
 		
 		// Compute delta Error
 		newError = test();
@@ -540,8 +572,6 @@ public class MlpTrainer {
 	 * A Callable that returns the mean square error of this task's slave
 	 * network on this task's assigned testing subset. For proper results, 
 	 * one must update this task's slave network between each run.
-	 * @param testingContainers
-	 * @return
 	 */
 	private class TestingTask implements Callable<Double> {
 		Mlp mMlp;
@@ -618,7 +648,7 @@ public class MlpTrainer {
 	 * A Callable that returns an Mlp with deltaWeights trained on this task's
 	 * assigned training subset. For proper results, one must update this
 	 * task's slave network between each run.
-	 * @author DuBious
+	 * @author Michael DuBois
 	 *
 	 */
 	private class TrainingTask implements Callable<Mlp> {
@@ -647,6 +677,10 @@ public class MlpTrainer {
 			return numContainersProcessed.get();
 		}
 		
+		/**
+		 * Call this when the callable is submitted to the executor to
+		 * clear the number of containers processed.
+		 */
 		public void onSubmit() {
 			numContainersProcessed.set(0);
 		}

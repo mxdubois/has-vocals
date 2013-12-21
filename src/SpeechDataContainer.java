@@ -3,6 +3,20 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.ArrayBlockingQueue;
 
+/**
+ * A container that preprocesses wav data into windowed LabeledData fit for
+ * speech recognition.
+ * 
+ * The following preprocessing is applied:
+ * * Removes DC offset
+ * * Applies a pre-emphasis filter
+ * * Computes the log-energy of the signal (first features)
+ * * Computes the MFCC for the signal
+ * * Computes the first & second derivative of features over DERIV_T windows
+ * 
+ * @author DuBious
+ *
+ */
 public class SpeechDataContainer extends WindowedWavContainer {
 
 	private double mLabel;
@@ -116,7 +130,7 @@ public class SpeechDataContainer extends WindowedWavContainer {
 				hammingWindow(mBuffer, offset, length, paddedLength);
 		
 		double[][] mfccsByChannel = 
-				MFCC.computeMFCC(hammedChannels, mSampleRate, 13, 1);
+				Mfcc.computeMFCC(hammedChannels, mSampleRate, 13, 1);
 		
 		int numMfccs = mfccsByChannel[0].length;
 		int featPerChannel = numMfccs + 1;
@@ -156,6 +170,12 @@ public class SpeechDataContainer extends WindowedWavContainer {
 		return datum;
 	}
 	
+	/**
+	 * Polls the derivatives queue for the next LabeledData
+	 * @return
+	 * @throws IOException
+	 * @throws WavFileException
+	 */
 	private LabeledData pollData() throws IOException, WavFileException {
 		LabeledData[] array = new LabeledData[mQueue.size()];
 		appendDerivatives(mQueue.toArray(array), 2);
@@ -175,7 +195,6 @@ public class SpeechDataContainer extends WindowedWavContainer {
 	 * Appends first derivatives within range (DERIV_T, length - DERIV_T]
 	 * Appends second derivatives within range (DERIV_T, length - 2*DERIV_T + 1]
 	 * If first derivatives have not already been appended, you will need to
-	 * call this method twice to get second derivatives.
 	 * @param data
 	 */
 	private void appendDerivatives(LabeledData[] data, int order) {
@@ -195,6 +214,7 @@ public class SpeechDataContainer extends WindowedWavContainer {
 				int max2 = data.length - q*DERIV_T + 1;
 
 				if(datum.highestDerivative() == q - 1) {
+					
 					// Take derivative of elements starting at 
 					// order-1 feature lengths
 					// For first, this is zero, for second it's one featLength
@@ -213,6 +233,9 @@ public class SpeechDataContainer extends WindowedWavContainer {
 						for(int k=1; k <= DERIV_T; k++) {
 							double[] prevFeats = data[i - k].getFeatures();
 							double[] nextFeats = data[i + k].getFeatures();
+							
+							// If the next datum does not have the required
+							// derivatives, we cannot do this computation
 							if(nextFeats.length <= j || prevFeats.length <= j) {
 								cannotCompute = true;
 								break;
@@ -221,11 +244,13 @@ public class SpeechDataContainer extends WindowedWavContainer {
 							numerator +=  k * (nextFeats[j] - prevFeats[j]);
 							denominator += ( k * k );
 						}
+						
+						// If we were unable to do this computation, move on
 						if(cannotCompute)
 							break;
-						double delta = numerator / (2D * denominator);
 						
-						//System.out.println("q: " + q + ",i: " + i + ",j: " + j + ", delta: " + delta);
+						// Else, compute the derivative
+						double delta = numerator / (2D * denominator);
 						
 						// Store derivative of item at specified location
 						newFeats[j + featLength] = delta;
@@ -243,7 +268,8 @@ public class SpeechDataContainer extends WindowedWavContainer {
 	 * The returned array contains real and complex arrays for each channel
 	 * each channel's array is of the correct dimension to be transformed 
 	 * by the apache commons FFT.
-	 * Implemented as defined in ETSI ES 201 108 V1.1.3 (2003-09).
+	 * 
+	 * Hamming implemented as defined in ETSI ES 201 108 V1.1.3 (2003-09).
 	 *
 	 * @return
 	 */
@@ -260,21 +286,11 @@ public class SpeechDataContainer extends WindowedWavContainer {
 			window[c][0] = new double[paddedLength];
 			window[c][1] = new double[paddedLength];
 			
-			if(c == 0) {
-//				System.out.println("got");
-//				System.arraycopy(buffer[c], offset, window[c][0], 0, length);
-//				System.out.println(Arrays.toString(window[c][0]));
-			}
-			
 			// For each value
 			for(int n=0; n < N ; n++) {
 				int i = n + offset;
 				double coeff = .54D - .46D*( Math.cos(2D*Math.PI*n / (N-1D)) );
 				window[c][0][n] = coeff * buffer[c][i];
-			}
-			if(c == 0) {
-				//System.out.println("returned");
-				//System.out.println(Arrays.toString(window[c][0]));
 			}
 		}
 		return window;
@@ -290,10 +306,13 @@ public class SpeechDataContainer extends WindowedWavContainer {
 	 */
 	public static double logEnergy(double[] frames, int offset, int length) {
 		double sum = 0;
+		
+		// Sum energy from offset to offset + length
 		for(int i=offset; i < length; i++){ 
 			int j = i - offset;
 			sum += frames[i] * j * j;
 		}
+		
 		if(sum <= 0)
 			return 0;
 		else 
@@ -313,7 +332,6 @@ public class SpeechDataContainer extends WindowedWavContainer {
 										  double lastValOF) 
 	{
 		double of = val - lastVal + .999D*lastValOF;
-		//System.out.println(val + " ==> " + of);
 		return of;
 	}
 	
@@ -326,7 +344,6 @@ public class SpeechDataContainer extends WindowedWavContainer {
 	 */
 	public static double preEmphasisFilter(double val, double lastVal) {
 		double filtered = val - PREEMPHASIS_COEFF*lastVal;
-		//System.out.println(val + " ==> " + filtered);
 		return filtered;
 	}
 

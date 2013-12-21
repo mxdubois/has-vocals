@@ -3,7 +3,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-
+/**
+ * Test the SpechDataContainer
+ * @author Michael DuBois
+ *
+ */
 public class TestSpeechDataContainer {
 
 	public static void main(String[] args) throws Exception {

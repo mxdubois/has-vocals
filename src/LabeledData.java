@@ -14,18 +14,38 @@ import java.util.Arrays;
 import java.util.List;
 
 
+/**
+ * A class to represent data with both features and labels.
+ * @author Michael DuBois
+ *
+ */
 public class LabeledData {
 
 	double[] mFeatures;
 	double[] mLabels;
 	int mBaseFeatureLength;
+	
+	// Whether or not this data is fake
 	boolean mIsFake = false;
+	// The highest derivative that has been appended to the mFeatures array
 	private int mHighestDerivative;
 	
+	/**
+	 * Constructs a LabeledData object.
+	 * @param features
+	 * @param labels
+	 */
 	public LabeledData(double[] features, double[] labels) {
 		this(features, features.length, 0, labels);
 	}
 	
+	/**
+	 * Constructs a LabeledData.
+	 * @param features
+	 * @param featureLength
+	 * @param highestDerivative
+	 * @param labels
+	 */
 	public LabeledData(double[] features, 
 					   int featureLength, 
 					   int highestDerivative, 
@@ -51,36 +71,70 @@ public class LabeledData {
 		mHighestDerivative = data.highestDerivative();
 	}
 	
+	/**
+	 * Set the features array and associated variables.
+	 * @param features
+	 * @param featureLength
+	 * @param highestDerivative
+	 */
 	public void setFeatures(double[] features, int featureLength, int highestDerivative) {
 		mFeatures = features;
 		mBaseFeatureLength = featureLength;
 		mHighestDerivative = highestDerivative;
 	}
 	
+	/**
+	 * Set the labels array.
+	 * @param labels
+	 */
 	public void setLabels(double[] labels) {
 		mLabels = labels;
 	}
 	
+	/**
+	 * Get the features array.
+	 * @return
+	 */
 	public double[] getFeatures() {
 		return mFeatures;
 	}
 	
+	/*
+	 * Get the labels array.
+	 */
 	public double[] getLabels(){
 		return mLabels;
 	}
 	
+	/**
+	 * Get the length of the base features (without derivatives).
+	 * @return
+	 */
 	public int baseFeatureLength() {
 		return mBaseFeatureLength;
 	}
 	
+	/**
+	 * Get the number (1st, 2nd, etc) of the highest derivative appended to 
+	 * features.
+	 * @return
+	 */
 	public int highestDerivative() {
 		return mHighestDerivative;
 	}
 	
+	/**
+	 * Set whether or not this data is fake data.
+	 * @param isFake
+	 */
 	public void setIsFake(boolean isFake) {
 		mIsFake = isFake;
 	}
 	
+	/**
+	 * Is this data fake?
+	 * @return
+	 */
 	public boolean isFake() {
 		return mIsFake;
 	}
@@ -90,6 +144,11 @@ public class LabeledData {
 		return Arrays.toString(mFeatures) + Arrays.toString(mLabels);
 	}
 	
+	/**
+	 * Get the string representation of this object that should be written to
+	 * a file.
+	 * @return
+	 */
 	public String toFileString() {
 		String str = "";
 		str += mHighestDerivative + "\t";
@@ -119,6 +178,14 @@ public class LabeledData {
 	public static final int FILE_POS_LABELS = 3;
 	public static final int FILE_POS_FEATURES = 4;
 	
+	/**
+	 * Write a list of Labeled Data to a file.
+	 * @param list
+	 * @param file
+	 * @param append
+	 * @return
+	 * @throws IOException
+	 */
 	public static File writeToFile(List<LabeledData> list, File file, boolean append) 
 			throws IOException 
 	{
@@ -137,6 +204,11 @@ public class LabeledData {
 		return file;
 	}
 	
+	/**
+	 * Construct a LabeledData object from it's fileString representation.
+	 * @param line
+	 * @return
+	 */
 	public static LabeledData fromFileString(String line) {
 		String[] items = line.split("\t");
 		
@@ -167,6 +239,11 @@ public class LabeledData {
 								labels);
 	}
 	
+	/**
+	 * Read an array of LabeledData from a file.
+	 * @param file
+	 * @return
+	 */
 	public static LabeledData[] readFromFile(File file) {
 		BufferedReader reader = null;
 		List<LabeledData> dataList = new ArrayList<LabeledData>();
